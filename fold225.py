@@ -5,7 +5,7 @@ Requirements:
  - no floats, only integers
 """
 import matplotlib.pyplot as plt
-from vertex4d import Vertex4D, AplusBsqrt2, SQRT2, R45, R225
+from vertex4d import Vertex4D, AplusBsqrt2, SQRT2, R45, R225, split_triangle
 import os
 import copy
 from fractions import Fraction
@@ -83,6 +83,16 @@ def plot_rendered_fold(fold: Fold225):
         face_vertices = [fold.vertices[idx].to_float() for idx in face]
         xs, ys = zip(*face_vertices)
         ax.fill(xs, ys, color='green', alpha=0.2)
+        
+        
+    for face in all_triangles.faces:
+        vertices = [all_triangles.vertices[idx] for idx in face]
+        new_edges = split_triangle(*vertices)
+        
+        for v1, v2, line_type in new_edges:
+            x1, y1 = v1.to_float()
+            x2, y2 = v2.to_float()
+            plt.plot([x1, x2], [y1, y2], color='#c0c0c0', linestyle='--')
     ax.set_aspect('equal')
     renders_dir = "renders"
     os.makedirs(renders_dir, exist_ok=True)
@@ -96,20 +106,42 @@ def plot_rendered_fold(fold: Fold225):
     
     
 if __name__ == "__main__":
-    # v1 = Vertex4D(0,0,0,0)
-    # v2 = Vertex4D(1,1,0,0)
-    # v3 = Vertex4D(1,1,1,1)
-    # v4 = Vertex4D(0,0,1,1)
-    # root_fold = Fold225(
-    #     vertices = [v1, v2, v3, v4],
-    #     edges = [(0,1,"b"),(1,2,"b"),(2,3,"b"),(3,0,"b"),(0,2,"m")],
-    #     faces = [(1,2,0)]
-    # )
-    # root_fold_copy = copy.deepcopy(root_fold)
+    v1 = Vertex4D(0,0,0,0)
+    v2 = Vertex4D(1,0,0,0)
+    v3 = Vertex4D(1,0,1,0)
+    v4 = Vertex4D(0,0,1,0)
     
-    # # test_dict = {root_fold: "test"}
-    # # breakpoint()
-    # plot_rendered_fold(root_fold)
+    v5 = Vertex4D(1,1,-1,1)
+    v6 = v2 * AplusBsqrt2(2,-1)
+    v7 = Vertex4D(0,1,0,0)
+    all_triangles = Fold225(
+        vertices = [v1, v2, v3, v4, v5, v6, v7],
+        edges = [
+            (0,5,'b'),(5,1,'b'),(1,4,'b'),(4,2,'b'),(2,3,'b'),(3,0,'b'),
+            (0,4,'m'),(0,6,'m'),(3,6,'m'),(4,5,'m'),(6,2,'m'),(6,4,'m')
+        ],
+        faces = [
+            (0,6,3),
+            # (6,2,3),(6,4,2),(0,4,6),(0,5,4),
+            # (5,1,4)
+        ]
+    )
+    
+    
+    # for face in all_triangles.faces:
+    #     vertices = [all_triangles.vertices[idx] for idx in face]
+    #     new_edges = split_triangle(*vertices)
+        
+    #     for v1, v2, line_type in new_edges:
+    #         x1, y1 = v1.to_float()
+    #         x2, y2 = v2.to_float()
+    #         plt.plot([x1, x2], [y1, y2], color='orange', linestyle='--')
+    
+    # test_dict = {root_fold: "test"}
+    # breakpoint()
+    plot_rendered_fold(all_triangles)
+
+
     
     
     # ==== 224 triangle (isoceles right triangle) ====
@@ -227,33 +259,32 @@ if __name__ == "__main__":
     
     
     # ==== 134 triangle (half kite) ====
-    A = Vertex4D(0,0,0,0)
-    B = Vertex4D(1,0,0,0)
-    C = Vertex4D(0,0,1,-1)
+    # A = Vertex4D(0,0,0,0)
+    # B = Vertex4D(1,0,0,0)
+    # C = Vertex4D(0,0,1,-1)
     
+    # # v1 = Vertex4D(Fraction(1,2),Fraction(1,2),Fraction(-1,2),Fraction(1,2))
+    # # v2 = B * (AplusBsqrt2(1,0)/AplusBsqrt2(1,1))
+    # # v4 = (B-v2) * Fraction(1,2) + v2
+    # # v3 = v2 + (v4-v2) * AplusBsqrt2(2,-1)
+    # # v5 = v4 * 2 - v3
+    # # print(v1,v2,v3,v4,v5)
     # v1 = Vertex4D(Fraction(1,2),Fraction(1,2),Fraction(-1,2),Fraction(1,2))
-    # v2 = B * (AplusBsqrt2(1,0)/AplusBsqrt2(1,1))
-    # v4 = (B-v2) * Fraction(1,2) + v2
-    # v3 = v2 + (v4-v2) * AplusBsqrt2(2,-1)
-    # v5 = v4 * 2 - v3
-    # print(v1,v2,v3,v4,v5)
-    v1 = Vertex4D(Fraction(1,2),Fraction(1,2),Fraction(-1,2),Fraction(1,2))
-    v2 = Vertex4D(-1,1,0,-1)
-    v3 = Vertex4D(2,-1,0,1)
-    v4 = Vertex4D(0,Fraction(1,2),0,Fraction(-1,2))
-    v5 = Vertex4D(-2,2,0,-2)
+    # v2 = Vertex4D(-1,1,0,-1)
+    # v3 = Vertex4D(2,-1,0,1)
+    # v4 = Vertex4D(0,Fraction(1,2),0,Fraction(-1,2))
+    # v5 = Vertex4D(-2,2,0,-2)
 
-    fold = Fold225(
-        vertices = [A,B,C,v1,v2,v3,v4,v5],
-        edges = [
-            (0,1,'b'),(1,2,'b'),(2,0,'b'),
-            (1,3,'a'),
-            (2,4,'a'),
-            (2,5,'a'),
-            (2,6,'a'),
-            (2,7,'a'),
-        ],
-    )
+    # fold = Fold225(
+    #     vertices = [A,B,C,v1,v2,v3,v4,v5],
+    #     edges = [
+    #         (0,1,'b'),(1,2,'b'),(2,0,'b'),
+    #         (1,3,'a'),
+    #         (2,4,'a'),
+    #         (2,5,'a'),
+    #         (2,6,'a'),
+    #         (2,7,'a'),
+    #     ],
+    # )
     
-    
-    plot_rendered_fold(fold)
+    # plot_rendered_fold(fold)
