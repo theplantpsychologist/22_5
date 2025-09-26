@@ -102,7 +102,7 @@ class AplusBsqrt2:
 
     def __neg__(self):
         return AplusBsqrt2(-self.A, -self.B)
-    
+
     def __abs__(self):
         return self if self.sign() > 0 else -self
 
@@ -111,7 +111,7 @@ class AplusBsqrt2:
 
     def sign(self):
         return np.sign(self.to_float())
-    
+
     def inv(self):
         denom = self.A**2 - 2 * self.B**2
         if denom == 0:
@@ -191,7 +191,7 @@ class Vertex4D:
 
     # TODO: play around with different possible definitions of multiplying two Vertex4D together. Dot product? Cross product? outer product? Quaternion multiplication?
 
-    def angle_to(self, other):
+    def angle_to(self, other: "Vertex4D") -> int | None:
         """
         Utilize 4d properties to compute the angle in units of 22.5 degrees from this vertex to another vertex in 4D space. If the angle is not an integer multiple of 22.5 degrees, return None
         """
@@ -217,7 +217,8 @@ class Vertex4D:
             if Y == X * tan_k:
                 return k if Y.sign() > 0 else (k + 8)
         return None
-    def apply_transform(self, matrix: np.ndarray):
+
+    def apply_transform(self, matrix: np.ndarray) -> "Vertex4D":
         """
         Apply a 4x4 transformation matrix to this vertex and return the resulting vertex
         """
@@ -225,12 +226,14 @@ class Vertex4D:
             raise ValueError("Can only apply 4x4 numpy array as transformation matrix")
         x, y, z, w = matrix @ np.array([self.x, self.y, self.z, self.w])
         return Vertex4D(x, y, z, w)
+
     def to_float(self):
         """
         Convert to 2D cartesian coordinates as floats
         """
         result = project4dto2d @ np.array([self.x, self.y, self.z, self.w])
         return (float(result[0]), float(result[1]))
+
     def vec(self):
         """
         Convert to numpy array
@@ -308,14 +311,9 @@ PRECOMPUTED_TRIANGLES = {
 
 def transform_triangle(A: Vertex4D, B: Vertex4D, C: Vertex4D) -> np.ndarray:
     """
-    Given a triangle ABC (sorted by increasing angle): construct the matrix that will transform it to the example triangle.
+    Given a triangle ABC (sorted by increasing angle): construct the matrix that will transform the precomputed triangle to it.
 
-    A -> 0000, B -> 1000, C -> above x axis
-
-    For full process of splitting the triangle:
-    1. Identify which type of triangle it is (by angle) and also sort the vertices by angle to determine which is A, B, and C
-    2. Compute the transformation matrix that takes ABC to the example triangle
-    3. Take the new vertices provided by the example triangle and apply the inverse of the transformation matrix to get the new vertices in the original space. Also apply the translation ( += A)
+    The precomputed triangle is assumed to be: A = 0000, B = 1000, C = above x axis
     """
     angleAB = A.angle_to(B)
     angleAC = A.angle_to(C)
@@ -323,37 +321,43 @@ def transform_triangle(A: Vertex4D, B: Vertex4D, C: Vertex4D) -> np.ndarray:
         raise ValueError(
             "Cannot compute transformation matrix for triangle with non-22.5 degree angles"
         )
-    # The following operations done to the example triangle to get it to ABC.
+    # The following operations done to the precomputed triangle to get it to ABC.
     # compute rotation component. Rotate (1,0,0,0) to (B-A) direction
     rotation_matrix = np.linalg.matrix_power(
         R45, (angleAB // 2)
     ) @ np.linalg.matrix_power(R225, angleAB % 2)
-    print(f"rotating by 45 degrees {angleAB//2} times and 22.5 degrees {angleAB%2} times")
 
     # compute scaling component. Scale (1,0,0,0) to (B-A) length
     # the rotation matrix can be inverted by numpy because there are no Fractions, R45 and R225 are essentially just permutation matrices
-    B_ = (B-A).apply_transform(np.linalg.inv(rotation_matrix))
-    scale_factor = abs(AplusBsqrt2(B_.x,(B_.y - B_.w)*Fraction(1,2)))
-    print(f"scaling by {scale_factor}")
+    B_ = (B - A).apply_transform(np.linalg.inv(rotation_matrix))
+    scale_factor = abs(AplusBsqrt2(B_.x, (B_.y - B_.w) * Fraction(1, 2)))
     scaling_matrix = scale_factor.A * np.eye(4) + scale_factor.B * SQRT2
 
     # reflection component
     reflection_matrix = REFLECTxAXIS if (angleAC - angleAB) % 16 > 8 else np.eye(4)
-    print(f"{'reflecting across x axis' if (angleAC - angleAB) % 16 > 8 else 'no reflection'}")
-    
+
     # Combine components. Matrix multiplication is done right to left, so the order of operations is reflection, then scaling, then rotation
     return rotation_matrix @ scaling_matrix @ reflection_matrix
     # Note: this can't be inverted by numpy unless we force the Fractions into floats
-    # return np.eye(4)
 
-def acute_diff(a1, a2, full=16):
+
+def acute_diff(a1: int, a2: int, full: int = 16) -> int:
+    """
+    Return the acute difference between two angles a1 and a2, assuming angles are in [0, full) and wrap around at full
+    """
     d = abs(a1 - a2)
     return min(d, full - d)
-# acute_diff = lambda a, b, full=16: min(((a - b) % full), full - ((a - b) % full))
+
 
 def split_triangle(v1: Vertex4D, v2: Vertex4D, v3: Vertex4D) -> list[list[Vertex4D]]:
     """
-    Given a triangle ABC (not necessarily sorted by angle), return the 5 new edges
+    Given a triangle ABC (not necessarily sorted by angle), return the 5 new edges to add to split it into smaller triangles based on the precomputed triangle types
+    1. Compute the angles at each vertex
+    2. Sort the angles and vertices by increasing angle
+    3. Look up the precomputed triangle type based on the angles
+    4. Compute the transformation matrix to map the precomputed triangle to the given triangle
+    5. For each new vertex in the precomputed triangle, apply the transformation matrix and translate to the correct position
+    6. Return the new edges connecting each vertex to its corresponding new vertices
     """
     angle1 = acute_diff(v1.angle_to(v3), v1.angle_to(v2))
     angle2 = acute_diff(v2.angle_to(v1), v2.angle_to(v3))
@@ -367,16 +371,21 @@ def split_triangle(v1: Vertex4D, v2: Vertex4D, v3: Vertex4D) -> list[list[Vertex
 
     angles = tuple(a for a, _ in angles_with_vertices)
     A, B, C = (v for _, v in angles_with_vertices)
-        
+
     new_vertices = PRECOMPUTED_TRIANGLES.get(angles)
     transformation = transform_triangle(A, B, C)
     # inverse = np.linalg.inv(transformation)
 
     new_edges = []
-    for v, key in zip((A, B, C), ("new_vertices_to_A", "new_vertices_to_B", "new_vertices_to_C")):
+    for v, key in zip(
+        (A, B, C), ("new_vertices_to_A", "new_vertices_to_B", "new_vertices_to_C")
+    ):
         for new_vertex in new_vertices[key]:
-            new_edges.append([v, new_vertex.apply_transform(transformation)+A,'a'])  # +A to undo translation. Transformation was computed with the assumption that A is at the origin
+            new_edges.append(
+                [v, new_vertex.apply_transform(transformation) + A, "a"]
+            )  # +A to undo translation. Transformation was computed with the assumption that A is at the origin
     return new_edges
+
 
 if __name__ == "__main__":
     pass
